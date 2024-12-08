@@ -1,0 +1,61 @@
+name: Deno CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+            deno-version: v2.x
+        # in deno.json, define a task as:
+        # deno check ./src/mod.ts
+      - name: Check types
+        run: deno task check
+        # in deno.json, define a task as:
+        # rm -rf coverage && deno test -A src/ --doc README.md --coverage
+      - name: Run tests
+        run: deno task test
+
+  codequality:
+    name: codequality (${{ matrix.job-name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - job-name: fmt
+            job-step: formatting
+            cmd: deno fmt --check
+            continue-on-error: false
+          - job-name: lint
+            job-step: linting
+            continue-on-error: false
+            cmd: deno lint
+            # in deno.json, define a task as:
+            # deno doc --lint ./src/mod.ts
+          - job-name: doc
+            job-step: documentation
+            cmd: deno task lintdocs
+            continue-on-error: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+            deno-version: v2.x
+      - name: Check ${{ matrix.job-step }}
+        run: ${{ matrix.cmd }}
+        continue-on-error: ${{ matrix.continue-on-error }}
